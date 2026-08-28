@@ -24,7 +24,6 @@
             overflow-x: hidden;
         }
 
-        /* Canvas Overlay for Confetti */
         #confetti-canvas {
             position: fixed;
             top: 0;
@@ -55,7 +54,6 @@
             position: relative;
         }
 
-        /* Celebratory Graphics Styling */
         .celebration-icon {
             position: absolute;
             top: -5px;
@@ -65,14 +63,8 @@
             animation: float 3s ease-in-out infinite alternate;
         }
 
-        .celebration-left {
-            left: 10px;
-        }
-
-        .celebration-right {
-            right: 10px;
-            animation-delay: 1.5s;
-        }
+        .celebration-left { left: 10px; }
+        .celebration-right { right: 10px; animation-delay: 1.5s; }
 
         @keyframes float {
             0% { transform: translateY(0px) rotate(0deg); }
@@ -106,9 +98,7 @@
             font-weight: 500;
         }
 
-        .form-group { 
-            margin-bottom: 22px; 
-        }
+        .form-group { margin-bottom: 22px; }
 
         label { 
             display: block; 
@@ -234,8 +224,12 @@
             transition: transform 0.1s ease, box-shadow 0.2s ease;
         }
 
-        button.submit-btn:active {
-            transform: scale(0.99);
+        button.submit-btn:active { transform: scale(0.99); }
+
+        .sync-btn {
+            background: #f59e0b;
+            margin-top: 12px;
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
         }
 
         .footer-disclaimer { 
@@ -261,7 +255,19 @@
         .success-screen p {
             color: #64748b;
             font-size: 16px;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
+        }
+
+        .offline-badge {
+            display: none;
+            background: #fef3c7;
+            color: #b45309;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 10px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #fde68a;
         }
     </style>
 </head>
@@ -348,12 +354,19 @@
     <div id="success-view" class="success-screen">
         <h2>You're Entered! 🎉</h2>
         <p>Thank you for stopping by today. Good luck in the draw!</p>
+        
+        <div id="offline-badge" class="offline-badge">
+            ⚠️ Saved offline. Will auto-sync when Wi-Fi connects (<span id="pending-count">0</span> pending).
+        </div>
+
         <button class="submit-btn" onclick="resetForm()">Enter Next Guest</button>
+        <button id="syncBtn" class="submit-btn sync-btn" style="display:none;" onclick="syncOfflineEntries()">Sync Offline Entries Now</button>
     </div>
 </div>
 
 <script>
     const HOST_PASSCODE = "1624"; 
+    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyiQ0nLYDg1nzrmmH_xPtwgej23V8Ap_czRUWD_49Al-6P5njfpLE-SkG194NByPHtDhg/exec";
 
     function selectRealtor(element, value) {
         document.querySelectorAll('input[name="realtor"]').forEach(input => input.parentElement.classList.remove('selected'));
@@ -403,27 +416,101 @@
             timestamp: new Date().toISOString()
         };
 
-        // PASTE YOUR GOOGLE APPS SCRIPT URL HERE:
-        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyiQ0nLYDg1nzrmmH_xPtwgej23V8Ap_czRUWD_49Al-6P5njfpLE-SkG194NByPHtDhg/exec";
-
         const btn = document.getElementById('submitBtn');
         btn.disabled = true;
         btn.textContent = "Submitting...";
 
-        // Launch Confetti Explosion
         launchConfetti();
+
+        // Check online status
+        if (!navigator.onLine) {
+            saveOffline(formData);
+            showSuccess();
+            return;
+        }
+
+        // Try online submission with 5-second timeout fallback to offline storage
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
 
         fetch(GOOGLE_SCRIPT_URL, {
             method: 'POST',
             mode: 'no-cors',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(formData)
+            body: JSON.stringify(formData),
+            signal: controller.signal
         })
-        .then(() => showSuccess())
-        .catch(() => showSuccess());
+        .then(() => {
+            clearTimeout(timeoutId);
+            showSuccess();
+        })
+        .catch(() => {
+            clearTimeout(timeoutId);
+            saveOffline(formData);
+            showSuccess();
+        });
     }
 
+    function saveOffline(data) {
+        let pending = JSON.parse(localStorage.getItem('pendingEntries') || '[]');
+        pending.push(data);
+        localStorage.setItem('pendingEntries', JSON.stringify(pending));
+        updateOfflineUI();
+    }
+
+    function updateOfflineUI() {
+        let pending = JSON.parse(localStorage.getItem('pendingEntries') || '[]');
+        const badge = document.getElementById('offline-badge');
+        const countSpan = document.getElementById('pending-count');
+        const syncBtn = document.getElementById('syncBtn');
+
+        if (pending.length > 0) {
+            badge.style.display = 'block';
+            syncBtn.style.display = 'block';
+            countSpan.textContent = pending.length;
+        } else {
+            badge.style.display = 'none';
+            syncBtn.style.display = 'none';
+        }
+    }
+
+    function syncOfflineEntries() {
+        let pending = JSON.parse(localStorage.getItem('pendingEntries') || '[]');
+        if (pending.length === 0 || !navigator.onLine) return;
+
+        const syncBtn = document.getElementById('syncBtn');
+        syncBtn.textContent = "Syncing...";
+        syncBtn.disabled = true;
+
+        let completed = 0;
+        pending.forEach((entry, index) => {
+            fetch(GOOGLE_SCRIPT_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(entry)
+            }).then(() => {
+                completed++;
+                if (completed === pending.length) {
+                    localStorage.removeItem('pendingEntries');
+                    updateOfflineUI();
+                    syncBtn.textContent = "Sync Complete! ✓";
+                    setTimeout(() => {
+                        syncBtn.textContent = "Sync Offline Entries Now";
+                        syncBtn.disabled = false;
+                    }, 2000);
+                }
+            });
+        });
+    }
+
+    // Auto-sync whenever Wi-Fi reconnects
+    window.addEventListener('online', () => {
+        syncOfflineEntries();
+    });
+
     function showSuccess() {
+        updateOfflineUI();
         document.getElementById('form-view').style.display = 'none';
         document.getElementById('success-view').style.display = 'block';
     }
@@ -442,66 +529,132 @@
         document.getElementById('form-view').style.display = 'block';
     }
 
-    /* Lightweight Confetti Generator */
-    const canvas = document.getElementById('confetti-canvas');
+ function triggerConfetti() {
+    const canvas = document.getElementById('confettiCanvas') || createConfettiCanvas();
     const ctx = canvas.getContext('2d');
-    let confettiParticles = [];
+    
+    // Auto-resize canvas to fill viewport
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
 
-    function resizeCanvas() {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-    }
-    window.addEventListener('resize', resizeCanvas);
-    resizeCanvas();
+    const colors = ['#007AFF', '#34C759', '#FF9500', '#FF2D55', '#AF52DE', '#FFCC00', '#5AC8FA'];
+    const particles = [];
+    const particleCount = 150; // Total particles per main burst
 
-    function launchConfetti() {
-        confettiParticles = [];
-        const colors = ['#2563eb', '#f59e0b', '#10b981', '#ec4899', '#8b5cf6', '#3b82f6'];
-        
-        for (let i = 0; i < 120; i++) {
-            confettiParticles.push({
-                x: canvas.width / 2,
-                y: canvas.height / 2 + 100,
-                r: Math.random() * 6 + 4,
-                dx: (Math.random() - 0.5) * 12,
-                dy: (Math.random() - 0.8) * 16,
-                color: colors[Math.floor(Math.random() * colors.length)],
-                tilt: Math.random() * 10,
-                tiltAngleIncremental: Math.random() * 0.08 + 0.05,
-                opacity: 1
-            });
+    class Particle {
+        constructor(x, y, isRibbon = false) {
+            this.x = x;
+            this.y = y;
+            this.color = colors[Math.floor(Math.random() * colors.length)];
+            
+            // Velocity & Physics
+            const angle = Math.random() * Math.PI * 2;
+            const speed = Math.random() * 12 + 8;
+            this.vx = Math.cos(angle) * speed;
+            this.vy = Math.sin(angle) * speed - 6; // Initial upward boost
+            this.gravity = 0.35;
+            this.drag = 0.96;
+            
+            // Rotation & Dimensions
+            this.shape = isRibbon ? 'ribbon' : (Math.random() > 0.5 ? 'circle' : 'square');
+            this.size = Math.random() * 8 + 6;
+            this.rotation = Math.random() * 360;
+            this.rotationSpeed = (Math.random() - 0.5) * 12;
+            this.opacity = 1;
+            this.decay = Math.random() * 0.012 + 0.008;
+            this.wobble = Math.random() * 10;
         }
-        animateConfetti();
+
+        update() {
+            this.vx *= this.drag;
+            this.vy *= this.drag;
+            this.vy += this.gravity;
+            this.x += this.vx + Math.sin(this.wobble) * 0.5;
+            this.y += this.vy;
+            
+            this.wobble += 0.08;
+            this.rotation += this.rotationSpeed;
+            this.opacity -= this.decay;
+        }
+
+        draw(ctx) {
+            if (this.opacity <= 0) return;
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, this.opacity);
+            ctx.translate(this.x, this.y);
+            ctx.rotate((this.rotation * Math.PI) / 180);
+
+            ctx.fillStyle = this.color;
+            ctx.strokeStyle = this.color;
+
+            if (this.shape === 'circle') {
+                ctx.beginPath();
+                ctx.arc(0, 0, this.size / 2, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (this.shape === 'ribbon') {
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(-this.size, 0);
+                ctx.quadraticCurveTo(0, Math.sin(this.wobble) * 6, this.size, 0);
+                ctx.stroke();
+            } else {
+                ctx.fillRect(-this.size / 2, -this.size / 2, this.size, this.size);
+            }
+
+            ctx.restore();
+        }
     }
 
-    function animateConfetti() {
+    // Helper to spawn a burst from a specific (x, y) origin
+    function createBurst(originX, originY, count) {
+        for (let i = 0; i < count; i++) {
+            const isRibbon = Math.random() < 0.25;
+            particles.push(new Particle(originX, originY, isRibbon));
+        }
+    }
+
+    // Stage 1: Initial Center Burst
+    createBurst(canvas.width / 2, canvas.height * 0.4, particleCount);
+
+    // Stage 2: Staggered Side Cannon Bursts for extra flair
+    setTimeout(() => createBurst(canvas.width * 0.2, canvas.height * 0.5, 75), 150);
+    setTimeout(() => createBurst(canvas.width * 0.8, canvas.height * 0.5, 75), 300);
+
+    // Animation Loop
+    function animate() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        let active = false;
 
-        confettiParticles.forEach((p) => {
-            p.x += p.dx;
-            p.y += p.dy;
-            p.dy += 0.3; // Gravity
-            p.tilt += p.tiltAngleIncremental;
-            p.opacity -= 0.008;
-
-            if (p.opacity > 0) {
-                active = true;
-                ctx.beginPath();
-                ctx.lineWidth = p.r;
-                ctx.strokeStyle = p.color;
-                ctx.globalAlpha = Math.max(0, p.opacity);
-                ctx.moveTo(p.x + p.tilt + p.r / 2, p.y);
-                ctx.lineTo(p.x + p.tilt, p.y + p.tilt + p.r / 2);
-                ctx.stroke();
+        for (let i = particles.length - 1; i >= 0; i--) {
+            particles[i].update();
+            particles[i].draw(ctx);
+            if (particles[i].opacity <= 0 || particles[i].y > canvas.height + 20) {
+                particles.splice(i, 1);
             }
-        });
+        }
 
-        if (active) {
-            requestAnimationFrame(animateConfetti);
+        if (particles.length > 0) {
+            requestAnimationFrame(animate);
         } else {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
+    }
+
+    animate();
+}
+
+function createConfettiCanvas() {
+    const canvas = document.createElement('canvas');
+    canvas.id = 'confettiCanvas';
+    canvas.style.position = 'fixed';
+    canvas.style.top = '0';
+    canvas.style.left = '0';
+    canvas.style.width = '100vw';
+    canvas.style.height = '100vh';
+    canvas.style.pointerEvents = 'none';
+    canvas.style.zIndex = '9999';
+    document.body.appendChild(canvas);
+    return canvas;
+}
     }
 </script>
 
