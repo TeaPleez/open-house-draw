@@ -224,7 +224,13 @@
             transition: transform 0.1s ease, box-shadow 0.2s ease;
         }
 
-        button.submit-btn:active { transform: scale(0.99); }
+        button.submit-btn:disabled {
+            background: #94a3b8;
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+
+        button.submit-btn:active:not(:disabled) { transform: scale(0.99); }
 
         .footer-disclaimer { 
             text-align: center; 
@@ -348,118 +354,113 @@
 </div>
 
 <script>
-    // Replace with your Google Apps Script Web App Deployment URL
     const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyiQ0nLYDg1nzrmmH_xPtwgej23V8Ap_czRUWD_49Al-6P5njfpLE-SkG194NByPHtDhg/exec";
     const HOST_PASSCODE = "1231";
     let countdownInterval;
 
     function selectRealtor(element, value) {
-        const cards = element.parentElement.querySelectorAll('.radio-card');
-        cards.forEach(card => card.classList.remove('selected'));
+        document.querySelectorAll('input[name="realtor"]').forEach(radio => {
+            radio.parentElement.classList.remove('selected');
+        });
         element.classList.add('selected');
-        element.querySelector('input').checked = true;
+        const input = element.querySelector('input');
+        input.checked = true;
     }
 
-    function selectEntryType(element, type) {
-        const cards = element.parentElement.querySelectorAll('.radio-card');
-        cards.forEach(card => card.classList.remove('selected'));
+    function selectEntryType(element, value) {
+        document.querySelectorAll('input[name="entryType"]').forEach(radio => {
+            radio.parentElement.classList.remove('selected');
+        });
         element.classList.add('selected');
-        element.querySelector('input').checked = true;
+        const input = element.querySelector('input');
+        input.checked = true;
 
         const passcodeContainer = document.getElementById('passcode-container');
-        if (type === 'Winner') {
+        if (value === 'Winner') {
             passcodeContainer.style.display = 'block';
         } else {
             passcodeContainer.style.display = 'none';
-            document.getElementById('passcode').value = '';
         }
     }
 
-    async function handleSubmit(event) {
+    function handleSubmit(event) {
         event.preventDefault();
 
+        const submitBtn = document.getElementById('submitBtn');
         const entryType = document.querySelector('input[name="entryType"]:checked').value;
         const passcode = document.getElementById('passcode').value;
 
-        let tickets = 1;
-        if (entryType === 'Winner') {
-            if (passcode !== HOST_PASSCODE) {
-                alert("Incorrect host passcode for Mini-Putt Winner entry.");
-                return;
-            }
-            tickets = 3;
+        // Verify passcode for 3X entries
+        if (entryType === 'Winner' && passcode !== HOST_PASSCODE) {
+            alert("Incorrect host passcode. Please enter the correct passcode to claim 3X entries.");
+            return;
         }
+
+        const realtorSelected = document.querySelector('input[name="realtor"]:checked');
+        if (!realtorSelected) {
+            alert("Please select whether you are working with a REALTOR®.");
+            return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Submitting...";
 
         const formData = {
-            timestamp: new Date().toISOString(),
-            fullName: document.getElementById('fullName').value.trim(),
-            phone: document.getElementById('phone').value.trim(),
-            email: document.getElementById('email').value.trim(),
-            realtor: document.querySelector('input[name="realtor"]:checked')?.value || 'No',
+            fullName: document.getElementById('fullName').value,
+            phone: document.getElementById('phone').value,
+            email: document.getElementById('email').value,
+            realtor: realtorSelected.value,
             entryType: entryType,
-            ticketsCount: tickets,
-            newsletter: document.getElementById('newsletter').checked ? 'Yes' : 'No'
+            tickets: entryType === 'Winner' ? 3 : 1,
+            newsletter: document.getElementById('newsletter').checked ? 'Yes' : 'No',
+            timestamp: new Date().toISOString()
         };
 
-        // Save locally first for offline support
-        saveLocally(formData);
-
-        // Try syncing to Google Sheets
-        if (navigator.onLine) {
-            syncOfflineEntries();
-        }
-
-        showSuccessScreen(tickets);
+        // Send data to Google Apps Script
+        fetch(GOOGLE_SCRIPT_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        })
+        .then(() => {
+            showSuccessScreen(entryType);
+        })
+        .catch(error => {
+            console.error('Error submitting form:', error);
+            // Even if network flag occurs under no-cors mode, proceed gracefully
+            showSuccessScreen(entryType);
+        })
+        .finally(() => {
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Submit Entry";
+        });
     }
 
-    function saveLocally(data) {
-        const entries = JSON.parse(localStorage.getItem('open_house_entries') || '[]');
-        entries.push(data);
-        localStorage.setItem('open_house_entries', JSON.stringify(entries));
-    }
-
-    async function syncOfflineEntries() {
-        const entries = JSON.parse(localStorage.getItem('open_house_entries') || '[]');
-        if (entries.length === 0 || !GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes("https://script.google.com/macros/s/AKfycbyiQ0nLYDg1nzrmmH_xPtwgej23V8Ap_czRUWD_49Al-6P5njfpLE-SkG194NByPHtDhg/exec")) return;
-
-        const remainingEntries = [];
-
-        for (const entry of entries) {
-            try {
-                await fetch(GOOGLE_SCRIPT_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(entry)
-                });
-            } catch (err) {
-                console.error("Failed to sync entry, retaining locally:", err);
-                remainingEntries.push(entry);
-            }
-        }
-
-        localStorage.setItem('open_house_entries', JSON.stringify(remainingEntries));
-    }
-
-    function showSuccessScreen(tickets) {
+    function showSuccessScreen(entryType) {
         document.getElementById('form-view').style.display = 'none';
         document.getElementById('success-view').style.display = 'block';
-        
-        const message = tickets > 1 
-            ? `Congratulations on your Mini-Putt win! You have received ${tickets} entries into the draw!`
-            : `Thank you for visiting today's open house. Good luck in the draw!`;
-        
-        document.getElementById('success-message').innerText = message;
-        triggerConfetti();
 
-        let secondsLeft = 5;
-        document.getElementById('timer').innerText = secondsLeft;
+        const msg = entryType === 'Winner' 
+            ? "Congratulations! Your Mini-Putt win has earned you 3 entries into the draw!" 
+            : "Thank you for visiting today's open house. Good luck in the draw!";
+        document.getElementById('success-message').textContent = msg;
+
+        startTimer();
+    }
+
+    function startTimer() {
+        let timeLeft = 5;
+        const timerSpan = document.getElementById('timer');
+        timerSpan.textContent = timeLeft;
+
         clearInterval(countdownInterval);
-        
         countdownInterval = setInterval(() => {
-            secondsLeft--;
-            document.getElementById('timer').innerText = secondsLeft;
-            if (secondsLeft <= 0) {
+            timeLeft--;
+            timerSpan.textContent = timeLeft;
+            if (timeLeft <= 0) {
                 clearInterval(countdownInterval);
                 resetForm();
             }
@@ -472,67 +473,16 @@
         
         // Reset custom radio states
         document.querySelectorAll('.radio-card').forEach(card => card.classList.remove('selected'));
-        const standardRadio = document.querySelector('input[name="entryType"][value="Standard"]');
-        if (standardRadio) {
-            standardRadio.checked = true;
-            standardRadio.parentElement.classList.add('selected');
+        const defaultEntry = document.querySelector('input[name="entryType"][value="Standard"]');
+        if (defaultEntry) {
+            defaultEntry.checked = true;
+            defaultEntry.parentElement.classList.add('selected');
         }
         document.getElementById('passcode-container').style.display = 'none';
 
         document.getElementById('success-view').style.display = 'none';
         document.getElementById('form-view').style.display = 'block';
     }
-
-    function triggerConfetti() {
-        const canvas = document.getElementById('confetti-canvas');
-        const ctx = canvas.getContext('2d');
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-
-        const pieces = [];
-        const colors = ['#2563eb', '#f59e0b', '#10b981', '#ec4899', '#8b5cf6'];
-
-        for (let i = 0; i < 80; i++) {
-            pieces.push({
-                x: Math.random() * canvas.width,
-                y: Math.random() * canvas.height - canvas.height,
-                size: Math.random() * 8 + 4,
-                color: colors[Math.floor(Math.random() * colors.length)],
-                speed: Math.random() * 4 + 2,
-                angle: Math.random() * 360
-            });
-        }
-
-        let animationFrame;
-        function render() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            let active = false;
-
-            pieces.forEach(p => {
-                p.y += p.speed;
-                p.angle += 2;
-                if (p.y < canvas.height) active = true;
-
-                ctx.save();
-                ctx.translate(p.x, p.y);
-                ctx.rotate((p.angle * Math.PI) / 180);
-                ctx.fillStyle = p.color;
-                ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
-                ctx.restore();
-            });
-
-            if (active) {
-                animationFrame = requestAnimationFrame(render);
-            } else {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-            }
-        }
-        render();
-    }
-
-    // Auto-sync whenever online status is regained
-    window.addEventListener('online', syncOfflineEntries);
-    window.addEventListener('load', syncOfflineEntries);
 </script>
 </body>
 </html>
