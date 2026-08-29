@@ -370,9 +370,80 @@
 </div>
 
 <script>
-    // Replace with your actual Google Apps Script Web App URL
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyiQ0nLYDg1nzrmmH_xPtwgej23V8Ap_czRUWD_49Al-6P5njfpLE-SkG194NByPHtDhg/exec";
-    const HOST_PASSCODE = "1234"; // Set your 4-digit passcode here
+    const HOST_PASSCODE = "1234";
+
+    // --- Confetti Engine ---
+    const canvas = document.getElementById('confetti-canvas');
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+    let animationFrameId = null;
+
+    function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    function triggerConfetti() {
+        particles = [];
+        const colors = ['#2563eb', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#ec4899'];
+        const count = 120;
+
+        for (let i = 0; i < count; i++) {
+            particles.push({
+                x: canvas.width / 2,
+                y: canvas.height / 2,
+                w: Math.random() * 10 + 5,
+                h: Math.random() * 6 + 4,
+                color: colors[Math.floor(Math.random() * colors.length)],
+                vx: (Math.random() - 0.5) * 18,
+                vy: (Math.random() - 0.7) * 18,
+                gravity: 0.3,
+                friction: 0.96,
+                rotation: Math.random() * 360,
+                rotSpeed: (Math.random() - 0.5) * 12,
+                opacity: 1
+            });
+        }
+
+        if (animationFrameId) cancelAnimationFrame(animationFrameId);
+        animateConfetti();
+    }
+
+    function animateConfetti() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        let activeParticles = 0;
+
+        particles.forEach(p => {
+            p.vx *= p.friction;
+            p.vy *= p.friction;
+            p.vy += p.gravity;
+            p.x += p.vx;
+            p.y += p.vy;
+            p.rotation += p.rotSpeed;
+            p.opacity -= 0.008;
+
+            if (p.opacity > 0) {
+                activeParticles++;
+                ctx.save();
+                ctx.translate(p.x, p.y);
+                ctx.rotate((p.rotation * Math.PI) / 180);
+                ctx.globalAlpha = Math.max(0, p.opacity);
+                ctx.fillStyle = p.color;
+                ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+                ctx.restore();
+            }
+        });
+
+        if (activeParticles > 0) {
+            animationFrameId = requestAnimationFrame(animateConfetti);
+        } else {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+    }
+    // -----------------------
 
     function selectRadioCard(element, groupName, type) {
         const group = document.getElementById(groupName);
@@ -429,7 +500,6 @@
                     body: JSON.stringify(formData)
                 });
             } else {
-                // Save locally if offline
                 let offlineEntries = JSON.parse(localStorage.getItem('offlineEntries') || '[]');
                 offlineEntries.push(formData);
                 localStorage.setItem('offlineEntries', JSON.stringify(offlineEntries));
@@ -438,7 +508,6 @@
             showSuccess(entryType);
         } catch (error) {
             console.error('Submission error:', error);
-            // Save locally on failure
             let offlineEntries = JSON.parse(localStorage.getItem('offlineEntries') || '[]');
             offlineEntries.push(formData);
             localStorage.setItem('offlineEntries', JSON.stringify(offlineEntries));
@@ -448,6 +517,8 @@
     }
 
     function showSuccess(entryType) {
+        triggerConfetti(); // Triggers the canvas explosion
+
         document.getElementById('form-view').style.display = 'none';
         document.getElementById('success-view').style.display = 'block';
         
@@ -479,18 +550,16 @@
         submitBtn.disabled = false;
         submitBtn.innerText = 'Enter Draw';
 
-        // Reset radio UI highlights
         const realtorCards = document.getElementById('realtorGroup').querySelectorAll('.radio-card');
         realtorCards.forEach(c => c.classList.remove('selected'));
 
         const entryTypeCards = document.getElementById('entryTypeGroup').querySelectorAll('.radio-card');
         entryTypeCards.forEach(c => c.classList.remove('selected'));
-        entryTypeCards[0].classList.add('selected'); // Default to Standard
+        entryTypeCards[0].classList.add('selected');
         
         document.getElementById('passcode-container').style.display = 'none';
     }
 
-    // Connection status check
     window.addEventListener('online', updateOnlineStatus);
     window.addEventListener('offline', updateOnlineStatus);
 
