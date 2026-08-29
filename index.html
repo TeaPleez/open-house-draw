@@ -362,7 +362,7 @@
     </div>
 
     <div id="success-view" class="success-screen">
-        <div style="font-size: 54px; margin-bottom: 10px;">✨</div>
+        <div style="font-size: 54px; margin-bottom: 10px;">🎉</div>
         <h2>You're Entered!</h2>
         <p id="success-message">Good luck in the draw! Thanks for stopping by today.</p>
         <div class="reset-countdown">This screen will reset for the next guest in <span id="timer">8</span> seconds.</div>
@@ -492,7 +492,7 @@
         };
 
         try {
-            if (navigator.onLine && SCRIPT_URL !== "https://script.google.com/macros/s/AKfycbyiQ0nLYDg1nzrmmH_xPtwgej23V8Ap_czRUWD_49Al-6P5njfpLE-SkG194NByPHtDhg/exec") {
+            if (navigator.onLine) {
                 await fetch(SCRIPT_URL, {
                     method: 'POST',
                     mode: 'no-cors',
