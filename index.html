@@ -370,9 +370,8 @@
 </div>
 
 <script>
-    // Replace with your Google Apps Script Web App URL
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyiQ0nLYDg1nzrmmH_xPtwgej23V8Ap_czRUWD_49Al-6P5njfpLE-SkG194NByPHtDhg/exec"; 
-    const HOST_PASSCODE = "1234"; // Default passcode for Mini-Putt 3x tickets validation
+    const HOST_PASSCODE = "1234";
 
     function updateOnlineStatus() {
         const badge = document.getElementById('connection-status');
@@ -442,7 +441,7 @@
             tickets: entryType === 'Winner' ? 3 : 1
         };
 
-        if (navigator.onLine && SCRIPT_URL !== "https://script.google.com/macros/s/AKfycbyiQ0nLYDg1nzrmmH_xPtwgej23V8Ap_czRUWD_49Al-6P5njfpLE-SkG194NByPHtDhg/exec") {
+        if (navigator.onLine) {
             try {
                 await fetch(SCRIPT_URL, {
                     method: 'POST',
@@ -468,7 +467,6 @@
     }
 
     async function syncOfflineEntries() {
-        if (SCRIPT_URL === "https://script.google.com/macros/s/AKfycbyiQ0nLYDg1nzrmmH_xPtwgej23V8Ap_czRUWD_49Al-6P5njfpLE-SkG194NByPHtDhg/exec") return;
         let entries = JSON.parse(localStorage.getItem('offline_open_house_entries') || '[]');
         if (entries.length === 0) return;
 
@@ -520,7 +518,6 @@
         document.getElementById('form-view').style.display = 'block';
         document.getElementById('success-view').style.display = 'none';
         
-        // Reset radio buttons state
         const realtorCards = document.querySelectorAll('#realtorGroup .radio-card');
         realtorCards.forEach(c => c.classList.remove('selected'));
         
@@ -534,7 +531,6 @@
         document.getElementById('submitBtn').textContent = 'Submit Contest Entry';
     }
 
-    // Canvas Confetti
     function triggerConfetti() {
         const canvas = document.getElementById('confetti-canvas');
         const ctx = canvas.getContext('2d');
