@@ -28,8 +28,8 @@
             position: fixed;
             top: 0;
             left: 0;
-            width: 100%;
-            height: 100%;
+            width: 100vw;
+            height: 100vh;
             pointer-events: none;
             z-index: 9999;
         }
@@ -349,205 +349,249 @@
             </div>
 
             <div class="checkbox-group">
-                <input type="checkbox" id="newsletter">
-                <label for="newsletter">
-                    <strong>Optional:</strong> YES! Keep me updated with Dylan's monthly market insights, community updates, and seasonal recipes. (Unsubscribe anytime).
-                </label>
+                <input type="checkbox" id="consent" required>
+                <label for="consent">I consent to Dylan Jones contacting me regarding real estate services and open house contest results.</label>
             </div>
 
-            <button type="submit" class="submit-btn" id="submitBtn">Submit Entry</button>
-        </form>
+            <button type="submit" class="submit-btn" id="submitBtn">Submit Contest Entry</button>
 
-        <div class="footer-disclaimer">
-            Winner notified directly via phone/email. Contest entry does not require newsletter subscription.<br>
-            Not intended to solicit buyers or sellers currently under contract.
-        </div>
+            <p class="footer-disclaimer">Not intended to solicit buyers or sellers currently under contract with a brokerage.</p>
+        </form>
     </div>
 
     <div id="success-view" class="success-screen">
-        <h2>🎉 Good Luck!</h2>
-        <p>Your entry has been registered for the draw.</p>
-        <button class="submit-btn" onclick="resetForm()">Submit Another Entry</button>
-        <div class="reset-countdown" id="countdown-text">Screen resets automatically in 10s...</div>
+        <div style="font-size: 48px; margin-bottom: 15px;">🎉</div>
+        <h2>You're Entered!</h2>
+        <p id="success-message">Good luck in the draw!</p>
+        <div class="reset-countdown">This screen will reset in <span id="timer">5</span> seconds for the next guest.</div>
     </div>
 </div>
 
 <script>
-    // Configuration
-    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyiQ0nLYDg1nzrmmH_xPtwgej23V8Ap_czRUWD_49Al-6P5njfpLE-SkG194NByPHtDhg/exec";
-    const HOST_PASSCODE = "1234"; 
-    let countdownTimer;
+    // Adjust canvas resolution dynamically
+    const canvas = document.getElementById('confetti-canvas');
+    const ctx = canvas.getContext('2d');
 
-    // --- Network & Offline Queue Handling ---
-    function getStoredQueue() {
-        return JSON.parse(localStorage.getItem('offline_entries') || '[]');
+    function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // Confetti Engine
+    let particles = [];
+    let animationId = null;
+
+    function triggerConfetti() {
+        particles = [];
+        const colors = ['#2563eb', '#f59e0b', '#10b981', '#ec4899', '#8b5cf6'];
+        for (let i = 0; i < 120; i++) {
+            particles.push({
+                x: canvas.width / 2,
+                y: canvas.height / 2,
+                vx: (Math.random() - 0.5) * 14,
+                vy: (Math.random() - 0.7) * 16,
+                size: Math.random() * 8 + 4,
+                color: colors[Math.floor(Math.random() * colors.length)],
+                rotation: Math.random() * 360,
+                rSpeed: (Math.random() - 0.5) * 10,
+                opacity: 1
+            });
+        }
+        if (animationId) cancelAnimationFrame(animationId);
+        animateConfetti();
     }
 
-    function setStoredQueue(queue) {
-        localStorage.setItem('offline_entries', JSON.stringify(queue));
-        updateNetworkStatusUI();
-    }
+    function animateConfetti() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        let alive = false;
 
-    function updateNetworkStatusUI() {
-        const statusElem = document.getElementById('connection-status');
-        const queue = getStoredQueue();
-        if (navigator.onLine) {
-            if (queue.length > 0) {
-                statusElem.className = 'status-badge status-offline';
-                statusElem.textContent = `Syncing (${queue.length})...`;
-            } else {
-                statusElem.className = 'status-badge status-online';
-                statusElem.textContent = 'Online';
+        particles.forEach(p => {
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += 0.35; // gravity
+            p.rotation += p.rSpeed;
+            p.opacity -= 0.008;
+
+            if (p.opacity > 0) {
+                alive = true;
+                ctx.save();
+                ctx.globalAlpha = p.opacity;
+                ctx.translate(p.x, p.y);
+                ctx.rotate((p.rotation * Math.PI) / 180);
+                ctx.fillStyle = p.color;
+                ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+                ctx.restore();
             }
+        });
+
+        if (alive) {
+            animationId = requestAnimationFrame(animateConfetti);
         } else {
-            statusElem.className = 'status-badge status-offline';
-            statusElem.textContent = `Offline (${queue.length} saved)`;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
     }
 
-    async function syncOfflineQueue() {
-        if (!navigator.onLine) return;
-        let queue = getStoredQueue();
-        if (queue.length === 0) return;
-
-        const remainingQueue = [];
-        for (const payload of queue) {
-            try {
-                const response = await fetch(GOOGLE_SCRIPT_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-            } catch (err) {
-                remainingQueue.push(payload);
-            }
-        }
-        setStoredQueue(remainingQueue);
-    }
-
-    window.addEventListener('online', () => {
-        updateNetworkStatusUI();
-        syncOfflineQueue();
-    });
-    window.addEventListener('offline', updateNetworkStatusUI);
-    setInterval(syncOfflineQueue, 30000); // Attempt sync every 30 seconds
-
-    // --- UI Logic ---
+    // Radio button handling
     function selectRadioCard(element, groupName, type) {
-        const group = document.getElementById(groupName);
-        group.querySelectorAll('.radio-card').forEach(card => card.classList.remove('selected'));
+        document.querySelectorAll(`#${groupName} .radio-card`).forEach(card => card.classList.remove('selected'));
         element.classList.add('selected');
         const radio = element.querySelector('input[type="radio"]');
         radio.checked = true;
 
         if (groupName === 'entryTypeGroup') {
             const passcodeContainer = document.getElementById('passcode-container');
-            const passcodeField = document.getElementById('passcode');
-            if (type === 'Winner') {
-                passcodeContainer.style.display = 'block';
-                passcodeField.required = true;
-            } else {
-                passcodeContainer.style.display = 'none';
-                passcodeField.required = false;
-                passcodeField.value = '';
-            }
+            passcodeContainer.style.display = (type === 'Winner') ? 'block' : 'none';
         }
     }
 
-    async function handleSubmit(event) {
-        event.preventDefault();
-        const submitBtn = document.getElementById('submitBtn');
-        const entryType = document.querySelector('input[name="entryType"]:checked').value;
-        const passcodeField = document.getElementById('passcode');
+    // Network Status Tracking & Non-Duplication Syncing
+    let isSyncing = false;
+    function updateOnlineStatus() {
+        const badge = document.getElementById('connection-status');
+        if (navigator.onLine) {
+            badge.textContent = 'Online';
+            badge.className = 'status-badge status-online';
+            syncOfflineEntries();
+        } else {
+            badge.textContent = 'Offline Mode';
+            badge.className = 'status-badge status-offline';
+        }
+    }
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
+    updateOnlineStatus();
 
-        if (entryType === 'Winner' && passcodeField.value !== HOST_PASSCODE) {
-            alert('Incorrect Host Passcode. Please check with Dylan.');
-            passcodeField.focus();
-            return;
+    async function syncOfflineEntries() {
+        if (isSyncing || !navigator.onLine) return;
+        
+        let offlineEntries = JSON.parse(localStorage.getItem('offlineEntries') || '[]');
+        if (offlineEntries.length === 0) return;
+
+        isSyncing = true;
+        
+        // Take a snapshot of entries to sync
+        const entriesToSync = [...offlineEntries];
+        const remainingEntries = [];
+
+        for (const entry of entriesToSync) {
+            try {
+                // Replace SCRIPT_URL with your Google Apps Script Web App URL
+                const response = await fetch('https://script.google.com/macros/s/AKfycbyiQ0nLYDg1nzrmmH_xPtwgej23V8Ap_czRUWD_49Al-6P5njfpLE-SkG194NByPHtDhg/exec', {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(entry)
+                });
+            } catch (err) {
+                // If post fails, keep entry in the queue
+                remainingEntries.push(entry);
+            }
         }
 
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Submitting...';
+        // Re-read storage in case new submissions arrived during sync, append unsent items only
+        const currentStorage = JSON.parse(localStorage.getItem('offlineEntries') || '[]');
+        const newUnsent = currentStorage.filter(e => !entriesToSync.some(synced => synced.id === e.id));
+        
+        localStorage.setItem('offlineEntries', JSON.stringify([...remainingEntries, ...newUnsent]));
+        isSyncing = false;
+    }
+
+    // Form Submission Logic
+    function handleSubmit(e) {
+        e.preventDefault();
+
+        const entryType = document.querySelector('input[name="entryType"]:checked').value;
+        if (entryType === 'Winner') {
+            const passcode = document.getElementById('passcode').value;
+            if (passcode !== '1234') { // Change passcode as needed
+                alert('Invalid Host Passcode for 3X tickets.');
+                return;
+            }
+        }
 
         const payload = {
-            fullName: document.getElementById('fullName').value.trim(),
-            phone: document.getElementById('phone').value.trim(),
-            email: document.getElementById('email').value.trim(),
+            id: Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+            fullName: document.getElementById('fullName').value,
+            phone: document.getElementById('phone').value,
+            email: document.getElementById('email').value,
             realtor: document.querySelector('input[name="realtor"]:checked').value,
             entryType: entryType,
-            tickets: entryType === 'Winner' ? 3 : 1,
-            newsletter: document.getElementById('newsletter').checked ? 'Yes' : 'No',
             timestamp: new Date().toISOString()
         };
 
         if (navigator.onLine) {
-            try {
-                await fetch(GOOGLE_SCRIPT_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-            } catch (error) {
-                console.warn('Network request failed. Saving entry locally.');
-                const queue = getStoredQueue();
-                queue.push(payload);
-                setStoredQueue(queue);
-            }
+            fetch('https://script.google.com/macros/s/AKfycbyiQ0nLYDg1nzrmmH_xPtwgej23V8Ap_czRUWD_49Al-6P5njfpLE-SkG194NByPHtDhg/exec', {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).catch(() => {
+                saveOffline(payload);
+            });
         } else {
-            const queue = getStoredQueue();
-            queue.push(payload);
-            setStoredQueue(queue);
+            saveOffline(payload);
         }
 
-        showSuccessScreen();
+        showSuccessScreen(entryType);
     }
 
-    function showSuccessScreen() {
+    function saveOffline(payload) {
+        const entries = JSON.parse(localStorage.getItem('offlineEntries') || '[]');
+        entries.push(payload);
+        localStorage.setItem('offlineEntries', JSON.stringify(entries));
+    }
+
+    function showSuccessScreen(entryType) {
         document.getElementById('form-view').style.display = 'none';
         document.getElementById('success-view').style.display = 'block';
 
-        let secondsLeft = 10;
-        const countdownText = document.getElementById('countdown-text');
-        countdownTimer = setInterval(() => {
-            secondsLeft--;
-            countdownText.textContent = `Screen resets automatically in ${secondsLeft}s...`;
-            if (secondsLeft <= 0) {
+        const msg = (entryType === 'Winner') 
+            ? 'Mini-Putt Bonus! You have 3 entries in the draw.' 
+            : 'Your entry has been registered. Good luck!';
+        document.getElementById('success-message').textContent = msg;
+
+        triggerConfetti();
+
+        let timeLeft = 5;
+        const timerElem = document.getElementById('timer');
+        timerElem.textContent = timeLeft;
+
+        const interval = setInterval(() => {
+            timeLeft--;
+            timerElem.textContent = timeLeft;
+            if (timeLeft <= 0) {
+                clearInterval(interval);
                 resetForm();
             }
         }, 1000);
     }
 
     function resetForm() {
-        clearInterval(countdownTimer);
         document.getElementById('entryForm').reset();
-        
-        // Reset custom radio selections back to defaults
-        const realtorGroup = document.getElementById('realtorGroup');
-        realtorGroup.querySelectorAll('.radio-card').forEach(card => card.classList.remove('selected'));
-        
-        const entryGroup = document.getElementById('entryTypeGroup');
-        entryGroup.querySelectorAll('.radio-card').forEach(card => card.classList.remove('selected'));
-        const defaultEntry = entryGroup.querySelector('input[value="Standard"]').parentNode;
-        defaultEntry.classList.add('selected');
-        defaultEntry.querySelector('input').checked = true;
-
         document.getElementById('passcode-container').style.display = 'none';
-        document.getElementById('passcode').required = false;
+        
+        // Reset custom radio selections
+        const radioCards = document.querySelectorAll('.radio-card');
+        radioCards.forEach(card => card.classList.remove('selected'));
+        
+        // Select standard defaults
+        const defaultRealtor = document.querySelector('input[name="realtor"][value="No"]');
+        if (defaultRealtor) {
+            defaultRealtor.checked = true;
+            defaultRealtor.closest('.radio-card').classList.add('selected');
+        }
 
-        const submitBtn = document.getElementById('submitBtn');
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Submit Entry';
+        const defaultEntry = document.querySelector('input[name="entryType"][value="Standard"]');
+        if (defaultEntry) {
+            defaultEntry.checked = true;
+            defaultEntry.closest('.radio-card').classList.add('selected');
+        }
 
         document.getElementById('success-view').style.display = 'none';
         document.getElementById('form-view').style.display = 'block';
-        
-        updateNetworkStatusUI();
     }
-
-    // Initialize UI status on load
-    updateNetworkStatusUI();
 </script>
 </body>
 </html>
