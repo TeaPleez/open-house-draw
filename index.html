@@ -37,4 +37,253 @@ input:focus,select:focus{border-color:#2563eb;background:#fff;box-shadow:0 0 0 4
 .checkbox-group input{width:22px;height:22px;margin-top:2px;accent-color:#2563eb;cursor:pointer;flex:none}
 .checkbox-group label{font-size:13px;line-height:1.45;color:#475569;cursor:pointer}
 .hp{position:absolute;left:-9999px;height:0;overflow:hidden}
-.submit-btn{width:100%;padding:18px;font-size:17px;font-weight:700;color:#fff;background:linear-gradient(135deg,#2563eb,#1d4ed8);border:none;border-radius:14px;cursor:pointer;box-shadow:0 8px 20px
+.submit-btn{width:100%;padding:18px;font-size:17px;font-weight:700;color:#fff;background:linear-gradient(135deg,#2563eb,#1d4ed8);border:none;border-radius:14px;cursor:pointer;box-shadow:0 8px 20px rgba(37,99,235,.35)}
+.submit-btn:disabled{background:#94a3b8;box-shadow:none;cursor:not-allowed}
+.footer-disclaimer{text-align:center;font-size:11px;color:#94a3b8;margin-top:22px;line-height:1.5}
+.success-screen{display:none;text-align:center;padding:30px 10px}
+.success-screen h2{font-size:28px;color:#0f172a;margin-bottom:10px}
+.success-screen p{color:#64748b;font-size:16px;margin-bottom:20px}
+.reset-countdown{margin-top:25px;font-size:13px;color:#94a3b8}
+</style>
+</head>
+<body>
+<canvas id="confetti-canvas"></canvas>
+<div class="container">
+  <div id="form-view">
+    <div class="header">
+      <div class="gift gift-left">🎁</div>
+      <div class="gift gift-right">🎁</div>
+      <span class="badge">Open House Draw</span>
+      <h1>Dylan Jones</h1>
+      <p>eXp Realty</p>
+      <div class="prize">Enter to win <span>$50 cash!</span></div>
+    </div>
+
+    <form id="entryForm" autocomplete="off" novalidate>
+      <div class="hp" aria-hidden="true"><input type="text" name="website" tabindex="-1" autocomplete="off"></div>
+
+      <div class="form-group">
+        <label class="field-label" for="fullName">Full name *</label>
+        <input type="text" id="fullName" name="fullName" required autocomplete="off" placeholder="First and Last Name">
+      </div>
+      <div class="form-group">
+        <label class="field-label" for="phone">Phone number *</label>
+        <input type="tel" id="phone" name="phone" required autocomplete="off" placeholder="(250) 000-0000">
+      </div>
+      <div class="form-group">
+        <label class="field-label" for="email">Email address *</label>
+        <input type="email" id="email" name="email" required autocomplete="off" placeholder="name@example.com">
+      </div>
+
+      <div class="form-group">
+        <label class="field-label">What's your timeline? *</label>
+        <div class="radio-group three">
+          <label class="radio-card"><input type="radio" name="timeline" value="3–6 months" required><span>3–6 months</span></label>
+          <label class="radio-card"><input type="radio" name="timeline" value="6 months–1 year"><span>6 months–1 year</span></label>
+          <label class="radio-card"><input type="radio" name="timeline" value="1 year+"><span>1 year+</span></label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="field-label">Have you been pre-approved for a mortgage? *</label>
+        <div class="radio-group">
+          <label class="radio-card"><input type="radio" name="preApproved" value="No" required><span>No</span></label>
+          <label class="radio-card"><input type="radio" name="preApproved" value="Yes"><span>Yes</span></label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="field-label">Are you currently working with a REALTOR®? *</label>
+        <div class="radio-group">
+          <label class="radio-card"><input type="radio" name="realtor" value="No" required><span>No</span></label>
+          <label class="radio-card"><input type="radio" name="realtor" value="Yes"><span>Yes</span></label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="field-label">Contest entry type *</label>
+        <div class="radio-group">
+          <label class="radio-card"><input type="radio" name="entryType" value="Standard" checked><span>Standard Entry</span><span style="font-size:12px;opacity:.8">(1 Ticket)</span></label>
+          <label class="radio-card"><input type="radio" name="entryType" value="Winner"><span>Mini-Putt Winner</span><span class="badge-gold">3X TICKETS</span></label>
+        </div>
+        <div id="passcode-container">
+          <label class="field-label" for="passcode" style="color:#b45309">Enter host passcode:</label>
+          <input type="password" id="passcode" name="passcode" inputmode="numeric" autocomplete="off" placeholder="4-digit code">
+        </div>
+      </div>
+
+      <div class="checkbox-group">
+        <input type="checkbox" id="newsletter" name="newsletter" value="Yes">
+        <label for="newsletter" id="consentLabel"></label>
+      </div>
+
+      <button type="submit" class="submit-btn" id="submitBtn">Enter Draw</button>
+    </form>
+
+    <div class="footer-disclaimer">Contest winners notified directly via phone/email. Contest entry does not require newsletter subscription.</div>
+    <div style="text-align:center"><span id="connection-status" class="status-badge status-online">Online</span></div>
+  </div>
+
+  <div id="success-view" class="success-screen">
+    <div style="font-size:54px;margin-bottom:10px">🎉</div>
+    <h2>You're Entered!</h2>
+    <p id="success-message"></p>
+    <div class="reset-countdown">This screen will reset for the next guest in <span id="timer">8</span> seconds.</div>
+  </div>
+</div>
+
+<script>
+// ---------- Settings ----------
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyiQ0nLYDg1nzrmmH_xPtwgej23V8Ap_czRUWD_49Al-6P5njfpLE-SkG194NByPHtDhg/exec";
+const CONSENT_TEXT = "Yes! Sign me up for the monthly newsletter with local highlights, market updates, home maintenance hacks and more! You can unsubscribe at any time.";
+const QUEUE_KEY = "offlineEntries";
+// Tag each open house by adding ?event=123-main-st to the page link / QR code.
+const EVENT_NAME = new URLSearchParams(location.search).get("event") || "";
+
+const $ = id => document.getElementById(id);
+$("consentLabel").textContent = CONSENT_TEXT;
+
+// ---------- Offline queue ----------
+const getQ = () => { try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || "[]"); } catch { return []; } };
+const setQ = q => { try { localStorage.setItem(QUEUE_KEY, JSON.stringify(q)); } catch {} updateStatus(); };
+
+async function send(entry) {
+  const res = await fetch(SCRIPT_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" }, // avoids a CORS preflight
+    body: JSON.stringify(entry)
+  });
+  return res.json();
+}
+
+let flushing = false;
+async function flushQueue() {
+  if (flushing || !getQ().length) return;
+  flushing = true;
+  const remaining = [];
+  for (const entry of getQ()) {
+    try {
+      const r = await send(entry);
+      if (r.ok || r.error === "invalid_entry") continue;          // saved, or unfixable: drop
+      if (r.error === "bad_passcode") { entry.entryType = "Standard"; entry.passcode = ""; }
+      remaining.push(entry);                                      // retry later
+    } catch { remaining.push(entry); }
+  }
+  setQ(remaining);
+  flushing = false;
+}
+
+function updateStatus() {
+  const n = getQ().length, off = !navigator.onLine, b = $("connection-status");
+  b.className = "status-badge " + (off || n ? "status-offline" : "status-online");
+  b.textContent = off ? "Offline" + (n ? ` · ${n} saved` : "") : (n ? `${n} pending` : "Online");
+}
+window.addEventListener("online", () => { updateStatus(); flushQueue(); });
+window.addEventListener("offline", updateStatus);
+window.addEventListener("load", () => { updateStatus(); flushQueue(); });
+setInterval(flushQueue, 60000);
+
+// ---------- Form ----------
+document.querySelectorAll('input[name="entryType"]').forEach(r => r.addEventListener("change", () => {
+  const win = document.querySelector('input[name="entryType"]:checked').value === "Winner";
+  $("passcode-container").style.display = win ? "block" : "none";
+  $("passcode").required = win;
+  if (!win) $("passcode").value = "";
+}));
+
+$("entryForm").addEventListener("submit", async ev => {
+  ev.preventDefault();
+  const form = ev.target;
+  if (!form.reportValidity()) return;
+
+  const btn = $("submitBtn");
+  btn.disabled = true; btn.textContent = "Submitting Entry...";
+  const f = new FormData(form);
+  const consent = !!f.get("newsletter");
+  const entry = {
+    entryId: crypto.randomUUID ? crypto.randomUUID() : Date.now() + "-" + Math.random().toString(36).slice(2),
+    timestamp: new Date().toISOString(),
+    fullName: f.get("fullName"), phone: f.get("phone"), email: f.get("email"),
+    timeline: f.get("timeline"), preApproved: f.get("preApproved"),
+    realtor: f.get("realtor"), entryType: f.get("entryType"),
+    passcode: f.get("passcode") || "",
+    newsletter: consent ? "Yes" : "No",
+    newsletterConsentText: consent ? CONSENT_TEXT : "",
+    event: EVENT_NAME,
+    website: f.get("website") || ""   // honeypot
+  };
+
+  try {
+    const r = await send(entry);
+    if (!r.ok) {
+      alert(r.error === "bad_passcode"
+        ? "Incorrect Host Passcode. Please check with the open house host."
+        : "Please check your details and try again.");
+      btn.disabled = false; btn.textContent = "Enter Draw";
+      return;
+    }
+  } catch {
+    // Network problem: keep the entry on this device and retry automatically.
+    // The server ignores duplicates, so a retry can never double-enter anyone.
+    setQ([...getQ(), entry]);
+  }
+  showSuccess(entry.entryType);
+});
+
+let countdown = null;
+function showSuccess(entryType) {
+  triggerConfetti();
+  $("form-view").style.display = "none";
+  $("success-view").style.display = "block";
+  $("success-message").textContent = entryType === "Winner"
+    ? "Congratulations on winning Mini-Putt! 3x tickets have been entered in the draw for you."
+    : "Good luck in the draw! Thanks for stopping by today.";
+  let t = 8; $("timer").textContent = t;
+  clearInterval(countdown);
+  countdown = setInterval(() => {
+    $("timer").textContent = --t;
+    if (t <= 0) { clearInterval(countdown); resetForm(); }
+  }, 1000);
+}
+
+function resetForm() {
+  $("entryForm").reset();
+  $("passcode-container").style.display = "none";
+  $("form-view").style.display = "block";
+  $("success-view").style.display = "none";
+  $("submitBtn").disabled = false; $("submitBtn").textContent = "Enter Draw";
+}
+
+// ---------- Confetti ----------
+const canvas = $("confetti-canvas"), ctx = canvas.getContext("2d");
+let particles = [], raf = null;
+const sizeCanvas = () => { canvas.width = innerWidth; canvas.height = innerHeight; };
+addEventListener("resize", sizeCanvas); sizeCanvas();
+
+function triggerConfetti() {
+  const colors = ["#2563eb", "#f59e0b", "#10b981", "#ef4444", "#8b5cf6", "#ec4899"];
+  particles = Array.from({ length: 120 }, () => ({
+    x: canvas.width / 2, y: canvas.height / 2,
+    w: Math.random() * 10 + 5, h: Math.random() * 6 + 4,
+    color: colors[Math.floor(Math.random() * colors.length)],
+    vx: (Math.random() - .5) * 18, vy: (Math.random() - .7) * 18,
+    rot: Math.random() * 360, rs: (Math.random() - .5) * 12, o: 1
+  }));
+  cancelAnimationFrame(raf); animate();
+}
+function animate() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  let live = 0;
+  for (const p of particles) {
+    p.vx *= .96; p.vy = p.vy * .96 + .3; p.x += p.vx; p.y += p.vy; p.rot += p.rs; p.o -= .008;
+    if (p.o <= 0) continue;
+    live++;
+    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot * Math.PI / 180);
+    ctx.globalAlpha = p.o; ctx.fillStyle = p.color; ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+    ctx.restore();
+  }
+  if (live) raf = requestAnimationFrame(animate); else ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+</script>
+</body>
+</html>
