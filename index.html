@@ -90,6 +90,10 @@ input:focus,select:focus{border-color:#2563eb;background:#fff;box-shadow:0 0 0 4
           <label class="radio-card"><input type="radio" name="preApproved" value="No" required><span>No</span></label>
           <label class="radio-card"><input type="radio" name="preApproved" value="Yes"><span>Yes</span></label>
         </div>
+           <div class="checkbox-group" id="brokerConsent" style="display:none;margin:14px 0 0">
+          <input type="checkbox" id="brokerOk" name="brokerOk" value="Yes">
+          <label for="brokerOk">Yes, please have my mortgage broker partner, Gary Nagra, contact me about getting pre-approved. I agree to my name, phone number and email being shared with them for this purpose.</label>
+        </div>
       </div>
 
       <div class="form-group">
@@ -165,7 +169,7 @@ async function flushQueue() {
     try {
       const r = await send(entry);
       if (r.ok || r.error === "invalid_entry") continue;          // saved, or unfixable: drop
-      if (r.error === "bad_passcode") { entry.entryType = "Standard"; entry.passcode = "9001"; }
+      if (r.error === "bad_passcode") { entry.entryType = "Standard"; entry.passcode = ""; }
       remaining.push(entry);                                      // retry later
     } catch { remaining.push(entry); }
   }
@@ -190,6 +194,11 @@ document.querySelectorAll('input[name="entryType"]').forEach(r => r.addEventList
   $("passcode").required = win;
   if (!win) $("passcode").value = "";
 }));
+  document.querySelectorAll('input[name="preApproved"]').forEach(r => r.addEventListener("change", () => {
+  const no = document.querySelector('input[name="preApproved"]:checked').value === "No";
+  $("brokerConsent").style.display = no ? "flex" : "none";
+  if (!no) $("brokerOk").checked = false;
+}));
 
 $("entryForm").addEventListener("submit", async ev => {
   ev.preventDefault();
@@ -205,6 +214,7 @@ $("entryForm").addEventListener("submit", async ev => {
     timestamp: new Date().toISOString(),
     fullName: f.get("fullName"), phone: f.get("phone"), email: f.get("email"),
     timeline: f.get("timeline"), preApproved: f.get("preApproved"),
+    brokerConsent: f.get("brokerOk") ? "Yes" : "No",
     realtor: f.get("realtor"), entryType: f.get("entryType"),
     passcode: f.get("passcode") || "",
     newsletter: consent ? "Yes" : "No",
@@ -248,6 +258,7 @@ function showSuccess(entryType) {
 
 function resetForm() {
   $("entryForm").reset();
+  $("brokerConsent").style.display = "none";
   $("passcode-container").style.display = "none";
   $("form-view").style.display = "block";
   $("success-view").style.display = "none";
