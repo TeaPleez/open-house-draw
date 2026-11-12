@@ -148,8 +148,11 @@ const $ = id => document.getElementById(id);
 $("consentLabel").textContent = CONSENT_TEXT;
 
 // ---------- Offline queue ----------
-const getQ = () => { try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || "[]"); } catch { return []; } };
-const setQ = q => { try { localStorage.setItem(QUEUE_KEY, JSON.stringify(q)); } catch {} updateStatus(); };
+// ---------- Offline queue ----------
+// Entries are saved on the device first, success shows right away, and sending happens in the background.
+let memQ = (() => { try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || "[]"); } catch { return []; } })();
+const getQ = () => memQ;
+const setQ = q => { memQ = q; try { localStorage.setItem(QUEUE_KEY, JSON.stringify(q)); } catch {} updateStatus(); };
 
 async function send(entry) {
   const res = await fetch(SCRIPT_URL, {
@@ -164,17 +167,21 @@ let flushing = false;
 async function flushQueue() {
   if (flushing || !getQ().length) return;
   flushing = true;
-  const remaining = [];
-  for (const entry of getQ()) {
-    try {
-      const r = await send(entry);
-      if (r.ok || r.error === "invalid_entry") continue;          // saved, or unfixable: drop
-      if (r.error === "bad_passcode") { entry.entryType = "Standard"; entry.passcode = ""; }
-      remaining.push(entry);                                      // retry later
-    } catch { remaining.push(entry); }
-  }
-  setQ(remaining);
-  flushing = false;
+  const snapshot = getQ().slice();
+  try {
+    for (const entry of snapshot) {
+      let keep = true;
+      try {
+        const r = await send(entry);
+        if (r.ok || r.error === "invalid_entry") keep = false;      // saved, or unfixable: drop
+        else if (r.error === "bad_passcode") { entry.entryType = "Standard"; entry.passcode = ""; }
+      } catch {}                                                    // offline: keep and retry later
+      const rest = getQ().filter(x => x.entryId !== entry.entryId);
+      setQ(keep ? [...rest, entry] : rest);
+    }
+  } finally { flushing = false; }
+  const seen = new Set(snapshot.map(x => x.entryId));
+  if (getQ().some(x => !seen.has(x.entryId))) flushQueue();         // entries added while sending
 }
 
 function updateStatus() {
@@ -194,7 +201,8 @@ document.querySelectorAll('input[name="entryType"]').forEach(r => r.addEventList
   $("passcode").required = win;
   if (!win) $("passcode").value = "";
 }));
-  document.querySelectorAll('input[name="preApproved"]').forEach(r => r.addEventListener("change", () => {
+
+document.querySelectorAll('input[name="preApproved"]').forEach(r => r.addEventListener("change", () => {
   const no = document.querySelector('input[name="preApproved"]:checked').value === "No";
   $("brokerConsent").style.display = no ? "flex" : "none";
   if (!no) $("brokerOk").checked = false;
@@ -204,6 +212,9 @@ $("entryForm").addEventListener("submit", async ev => {
   ev.preventDefault();
   const form = ev.target;
   if (!form.reportValidity()) return;
+  // Same checks the server makes, so a bad entry is caught here instead of being dropped later.
+  if (!/^\S+@\S+\.\S+$/.test($("email").value.trim())) { alert("Please enter a valid email address."); return; }
+  if ($("phone").value.replace(/\D/g, "").length < 10) { alert("Please enter a 10-digit phone number."); return; }
 
   const btn = $("submitBtn");
   btn.disabled = true; btn.textContent = "Submitting Entry...";
@@ -223,19 +234,24 @@ $("entryForm").addEventListener("submit", async ev => {
     website: f.get("website") || ""   // honeypot
   };
 
-  try {
-    const r = await send(entry);
-    if (!r.ok) {
-      alert(r.error === "bad_passcode"
-        ? "Incorrect Host Passcode. Please check with the open house host."
-        : "Please check your details and try again.");
-      btn.disabled = false; btn.textContent = "Enter Draw";
-      return;
+  if (entry.entryType === "Winner") {
+    // Winner entries wait for the server, so a wrong host passcode is caught right away.
+    try {
+      const r = await send(entry);
+      if (!r.ok) {
+        alert(r.error === "bad_passcode"
+          ? "Incorrect Host Passcode. Please check with the open house host."
+          : "Please check your details and try again.");
+        btn.disabled = false; btn.textContent = "Enter Draw";
+        return;
+      }
+    } catch {
+      setQ([...getQ(), entry]);   // network problem: keep it and retry automatically
     }
-  } catch {
-    // Network problem: keep the entry on this device and retry automatically.
-    // The server ignores duplicates, so a retry can never double-enter anyone.
+  } else {
+    // Standard entries: save on the device, show success now, send in the background.
     setQ([...getQ(), entry]);
+    flushQueue();
   }
   showSuccess(entry.entryType);
 });
