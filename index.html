@@ -165,7 +165,7 @@ async function flushQueue() {
     try {
       const r = await send(entry);
       if (r.ok || r.error === "invalid_entry") continue;          // saved, or unfixable: drop
-      if (r.error === "bad_passcode") { entry.entryType = "Standard"; entry.passcode = ""; }
+      if (r.error === "bad_passcode") { entry.entryType = "Standard"; entry.passcode = "9001"; }
       remaining.push(entry);                                      // retry later
     } catch { remaining.push(entry); }
   }
