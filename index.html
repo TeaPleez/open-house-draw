@@ -39,7 +39,7 @@ input:focus,select:focus{border-color:#2563eb;background:#fff;box-shadow:0 0 0 4
 .hp{position:absolute;left:-9999px;height:0;overflow:hidden}
 .submit-btn{width:100%;padding:18px;font-size:17px;font-weight:700;color:#fff;background:linear-gradient(135deg,#2563eb,#1d4ed8);border:none;border-radius:14px;cursor:pointer;box-shadow:0 8px 20px rgba(37,99,235,.35)}
 .submit-btn:disabled{background:#94a3b8;box-shadow:none;cursor:not-allowed}
-.footer-disclaimer{text-align:center;font-size:11px;color:#94a3b8;margin-top:22px;line-height:1.5}
+.footer-disclaimer{text-align:center;font-size:12px;color:#64748b;margin-top:22px;line-height:1.5}
 .success-screen{display:none;text-align:center;padding:30px 10px}
 .success-screen h2{font-size:28px;color:#0f172a;margin-bottom:10px}
 .success-screen p{color:#64748b;font-size:16px;margin-bottom:20px}
@@ -90,7 +90,7 @@ input:focus,select:focus{border-color:#2563eb;background:#fff;box-shadow:0 0 0 4
           <label class="radio-card"><input type="radio" name="preApproved" value="No" required><span>No</span></label>
           <label class="radio-card"><input type="radio" name="preApproved" value="Yes"><span>Yes</span></label>
         </div>
-           <div class="checkbox-group" id="brokerConsent" style="display:none;margin:14px 0 0">
+        <div class="checkbox-group" id="brokerConsent" style="display:none;margin:14px 0 0">
           <input type="checkbox" id="brokerOk" name="brokerOk" value="Yes">
           <label for="brokerOk">Yes, please have my mortgage broker partner, Gary Nagra, contact me about getting pre-approved. I agree to my name, phone number and email being shared with them for this purpose.</label>
         </div>
@@ -124,7 +124,7 @@ input:focus,select:focus{border-color:#2563eb;background:#fff;box-shadow:0 0 0 4
       <button type="submit" class="submit-btn" id="submitBtn">Enter Draw</button>
     </form>
 
-    <div class="footer-disclaimer">Contest winners notified directly via phone/email. Contest entry does not require newsletter subscription.</div>
+    <div class="footer-disclaimer">No purchase necessary. Odds of winning are 1 in 250 per ticket. Winners must correctly answer a skill-testing question. Winners are notified directly by phone or email. Entry does not require a newsletter subscription.<br>By entering, you agree to the <a href="rules.html" target="_blank" rel="noopener" style="color:inherit">Official Contest Rules</a> and <a href="privacy.html" target="_blank" rel="noopener" style="color:inherit">Privacy Notice</a>.</div>
     <div style="text-align:center"><span id="connection-status" class="status-badge status-online">Online</span></div>
   </div>
 
@@ -147,7 +147,6 @@ const EVENT_NAME = new URLSearchParams(location.search).get("event") || "";
 const $ = id => document.getElementById(id);
 $("consentLabel").textContent = CONSENT_TEXT;
 
-// ---------- Offline queue ----------
 // ---------- Offline queue ----------
 // Entries are saved on the device first, success shows right away, and sending happens in the background.
 let memQ = (() => { try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || "[]"); } catch { return []; } })();
@@ -213,7 +212,7 @@ $("entryForm").addEventListener("submit", async ev => {
   const form = ev.target;
   if (!form.reportValidity()) return;
   // Same checks the server makes, so a bad entry is caught here instead of being dropped later.
-  if (!/^\S+@\S+\.\S+$/.test($("email").value.trim())) { alert("Please enter a valid email address."); return; }
+  if (!/^[^\s@,;<>()"]+@[^\s@,;<>()"]+\.[^\s@,;<>()"]+$/.test($("email").value.trim())) { alert("Please enter a valid email address."); return; }
   if ($("phone").value.replace(/\D/g, "").length < 10) { alert("Please enter a 10-digit phone number."); return; }
 
   const btn = $("submitBtn");
