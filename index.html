@@ -59,20 +59,20 @@ input:focus,select:focus{border-color:#2563eb;background:#fff;box-shadow:0 0 0 4
       <div class="prize">Enter to win <span>$50 cash!</span></div>
     </div>
 
-    <form id="entryForm" autocomplete="off" novalidate>
+    <form id="entryForm" novalidate>
       <div class="hp" aria-hidden="true"><input type="text" name="website" tabindex="-1" autocomplete="off"></div>
 
       <div class="form-group">
         <label class="field-label" for="fullName">Full name *</label>
-        <input type="text" id="fullName" name="fullName" required autocomplete="off" placeholder="First and Last Name">
+        <input type="text" id="fullName" name="fullName" required autocomplete="name" placeholder="First and Last Name">
       </div>
       <div class="form-group">
         <label class="field-label" for="phone">Phone number *</label>
-        <input type="tel" id="phone" name="phone" required autocomplete="off" placeholder="(250) 000-0000">
+        <input type="tel" id="phone" name="phone" required autocomplete="tel" placeholder="(250) 000-0000">
       </div>
       <div class="form-group">
         <label class="field-label" for="email">Email address *</label>
-        <input type="email" id="email" name="email" required autocomplete="off" placeholder="name@example.com">
+        <input type="email" id="email" name="email" required autocomplete="email" placeholder="name@example.com">
       </div>
 
       <div class="form-group">
@@ -146,6 +146,12 @@ const EVENT_NAME = new URLSearchParams(location.search).get("event") || "";
 
 const $ = id => document.getElementById(id);
 $("consentLabel").textContent = CONSENT_TEXT;
+  // Tablet mode: open the page with ?kiosk=1 on the shared tablet to turn autofill off,
+// so one guest's details never appear for the next.
+if (new URLSearchParams(location.search).get("kiosk")) {
+  document.querySelectorAll("#entryForm input").forEach(i => i.setAttribute("autocomplete", "off"));
+  $("entryForm").setAttribute("autocomplete", "off");
+}
 
 // ---------- Offline queue ----------
 // Entries are saved on the device first, success shows right away, and sending happens in the background.
