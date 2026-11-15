@@ -220,6 +220,7 @@ $("entryForm").addEventListener("submit", async ev => {
   // Same checks the server makes, so a bad entry is caught here instead of being dropped later.
   if (!/^[^\s@,;<>()"]+@[^\s@,;<>()"]+\.[^\s@,;<>()"]+$/.test($("email").value.trim())) { alert("Please enter a valid email address."); return; }
   if ($("phone").value.replace(/\D/g, "").length < 10) { alert("Please enter a 10-digit phone number."); return; }
+  if (!/^\S{2,}\s+(\S+\s+)*\S{2,}$/.test($("fullName").value.trim())) { alert("Please enter your first and last name."); return; }
 
   const btn = $("submitBtn");
   btn.disabled = true; btn.textContent = "Submitting Entry...";
